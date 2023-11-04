@@ -76,7 +76,7 @@ def exact_m(J, h, T, N):
 if __name__ == '__main__':
     N = 100
     J = 1
-    size = 10*5
+    size = 10**7
     teq = size * 0.05
     initial_spins = np.full(N, 1)
     initial_spins[rng.choice(N, size=N//2, replace=False)] = -1
@@ -94,12 +94,14 @@ if __name__ == '__main__':
         plt.plot(hspace, avgM, label='Monte Carlo')
         plt.plot(hspace, N*exact_limit_m(J, hspace, T), label='Exact Solution in Thermodynamic Limit')
         plt.plot(hspace, N*exact_m(J, hspace, T, N), label=rf'Exact Solution for $N={N}$')
-        plt.legend()
-        plt.title('M')
-        plt.figure()
-        plt.plot(hspace, avgeng)
-        plt.title('Energy')
-        plt.show()
-        quit()
+        plt.legend(bbox_to_anchor=(0.5,-0.35), loc='lower center')
+        plt.title(rf'Magnetization at $T = {T/J} \cdot J/k_B$')
+        plt.xlabel(rf'$h/J$')
+        plt.ylabel('Average Magnetization')
+        plt.savefig(f'temp_{T}.png', bbox_inches='tight')
+        # plt.figure()
+        # plt.plot(hspace, avgeng)
+        # plt.title('Energy')
+    plt.show()
 
 
