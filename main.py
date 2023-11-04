@@ -7,7 +7,7 @@ rng = np.random.default_rng()
 class config:
     def __init__(self, spins, J, h, M=None, energy=None):
         self.spins = spins
-        self.N = len(spins)
+        self.N = spins.shape[-1]
         self.J = J
         self.h = h
         if M is not None:
@@ -20,18 +20,20 @@ class config:
             self.energy = self.compute_energy()
 
     def compute_energy(self):
-        return -self.J*np.vdot(self.spins, np.roll(self.spins, 1)) - self.h*self.M
+        return -self.J*np.sum(self.spins * np.roll(self.spins, 1, axis=-1)) - self.h*self.M
 
     def compute_M(self):
-        return np.sum(self.spins)
+        return np.sum(self.spins, axis=-1)
 
     def flip_rand_spin(self):
-        i0 = rng.integers(0, self.N)
+        i0 = rng.integers(0, self.N, len(h))
+        idx = np.arange(len(h))
         new_spins = np.copy(self.spins)
-        new_spins[i0] = -self.spins[i0]
-        new_M = self.M + 2*new_spins[i0]
-        new_energy = self.energy - 2*self.J*new_spins[i0]*(new_spins[i0-1] + new_spins[(i0+1) % self.N])
-        new_energy -= 2*self.h*new_spins[i0]
+        new_spins[idx, i0] = -self.spins[idx, i0]
+        new_M = self.M + 2*new_spins[idx, i0]
+        new_energy = self.energy
+        new_energy -= 2*self.J*new_spins[idx, i0]*(new_spins[idx, (i0-1) % self.N] + new_spins[idx, (i0+1) % self.N])
+        new_energy -= 2*self.h*new_spins[idx, i0]
         return config(new_spins, self.J, self.h, new_M, new_energy)
 
 
