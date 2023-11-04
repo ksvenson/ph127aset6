@@ -59,25 +59,24 @@ def exact_limit_m(J, h, T):
 
 
 def exact_m(J, h, T, N):
-    # Compute Z
     beta = 1/T
     cosh = np.cosh(beta*h)
     sinh = np.sinh(beta*h)
     expBJ = np.exp(beta*J)
     sqrt = np.sqrt(sinh**2 + expBJ**(-4))
     lm = expBJ*(cosh-sqrt)
-    lp = expBJ*(cosh-sqrt)
+    lp = expBJ*(cosh+sqrt)
     Z = lm**N + lp**N
 
-    sqrt_inv = sqrt**(-1)
-    m = expBJ*sinh*(lm**(N-1)*(1-sqrt_inv) + lp**(N-1)*(1+sqrt_inv))/Z
+    der = cosh/sqrt
+    m = expBJ*sinh*(lm**(N-1)*(1-der) + lp**(N-1)*(1+der))/Z
     return m
 
 
 if __name__ == '__main__':
     N = 100
     J = 1
-    size = 10*3
+    size = 10*5
     teq = size * 0.05
     initial_spins = np.full(N, 1)
     initial_spins[rng.choice(N, size=N//2, replace=False)] = -1
@@ -95,6 +94,7 @@ if __name__ == '__main__':
         plt.plot(hspace, avgM, label='Monte Carlo')
         plt.plot(hspace, N*exact_limit_m(J, hspace, T), label='Exact Solution in Thermodynamic Limit')
         plt.plot(hspace, N*exact_m(J, hspace, T, N), label=rf'Exact Solution for $N={N}$')
+        plt.legend()
         plt.title('M')
         plt.figure()
         plt.plot(hspace, avgeng)
