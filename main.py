@@ -26,8 +26,8 @@ class config:
         return np.sum(self.spins, axis=-1)
 
     def flip_rand_spin(self):
-        i0 = rng.integers(0, self.N, len(h))
-        idx = np.arange(len(h))
+        i0 = rng.integers(0, self.N, len(self.h))
+        idx = np.arange(len(self.h))
         new_spins = np.copy(self.spins)
         new_spins[idx, i0] = -self.spins[idx, i0]
         new_M = self.M + 2*new_spins[idx, i0]
@@ -41,16 +41,15 @@ def generate_samples(alpha, J, h, T, size):
     output = [alpha]
     for i in range(size):
         beta = alpha.flip_rand_spin()
-        if beta.energy <= alpha.energy:
-            output += [beta]
-            alpha = beta
-        else:
-            prob = np.exp((alpha.energy - beta.energy)/T)
-            if rng.random() < prob:
-                output += [beta]
-                alpha = beta
-            else:
-                output += [alpha]
+        prob = np.exp((alpha.energy - beta.energy)/T)
+        rand = rng.random(size=len(h))
+        accept = (beta.energy <= alpha.energy) | (rand < prob)
+        new_M = np.where(accept, beta.M, alpha.M)
+        new_energy = np.where(accept, beta.energy, alpha.energy)
+        accept = np.vstack((accept,)*beta.spins.shape[-1]).T
+        new_spins = np.where(accept, beta.spins, alpha.spins)
+        alpha = config(new_spins, J, h, M=new_M, energy=new_energy)
+        output.append(alpha)
     return output
 
 
@@ -78,20 +77,16 @@ def exact_m(J, h, T, N):
 if __name__ == '__main__':
     N = 100
     J = 1
-    size = 10**7
+    size = 10**3
     teq = size * 0.05
-    initial_spins = np.full(N, 1)
-    initial_spins[rng.choice(N, size=N//2, replace=False)] = -1
+    hspace = J*np.arange(-2, 2, 0.02)
+    initial_spins = np.full((len(hspace), N), 1)
+    for i in range(len(hspace)):
+        initial_spins[i, rng.choice(N, size=N//2, replace=False)] = -1
     for T in (J/2, J, 2*J):
-        avgM = []
-        avgeng = []
-        hspace = J*np.arange(-2, 2, 0.02)
-        for h in hspace:
-            print(h)
-            initial = config(initial_spins, J, h, M=0)
-            samples = generate_samples(initial, J, h, T, size)
-            avgM.append(np.mean([s.M for s in samples]))
-            avgeng.append(np.mean([e.energy for e in samples]))
+        initial = config(initial_spins, J, hspace, M=0)
+        samples = generate_samples(initial, J, hspace, T, size)
+        avgM = [np.mean([s.M[i] for s in samples]) for i in range(len(hspace))]
         plt.figure()
         plt.plot(hspace, avgM, label='Monte Carlo')
         plt.plot(hspace, N*exact_limit_m(J, hspace, T), label='Exact Solution in Thermodynamic Limit')
