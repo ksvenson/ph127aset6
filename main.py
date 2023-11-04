@@ -13,67 +13,86 @@ class config:
         if M is not None:
             self.M = M
         else:
-            self.M = np.sum(spins)
+            self.M = self.compute_M()
         if energy is not None:
             self.energy = energy
         else:
-            self.energy = -self.J*np.vdot(spins, np.roll(spins, 1)) - self.h*self.M
+            self.energy = self.compute_energy()
+
+    def compute_energy(self):
+        return -self.J*np.vdot(self.spins, np.roll(self.spins, 1)) - self.h*self.M
+
+    def compute_M(self):
+        return np.sum(self.spins)
 
     def flip_rand_spin(self):
         i0 = rng.integers(0, self.N)
         new_spins = np.copy(self.spins)
         new_spins[i0] = -self.spins[i0]
         new_M = self.M + 2*new_spins[i0]
-        new_energy = self.energy - 2*self.J*self.spins[i0]*(self.spins[i0-1] + self.spins[(i0+1) % self.N])
-        new_energy -= 2*self.h*self.spins[i0]
+        new_energy = self.energy - 2*self.J*new_spins[i0]*(new_spins[i0-1] + new_spins[(i0+1) % self.N])
+        new_energy -= 2*self.h*new_spins[i0]
         return config(new_spins, self.J, self.h, new_M, new_energy)
 
 
 def generate_samples(alpha, J, h, T, size):
     output = [alpha]
-    count = 0
     for i in range(size):
         beta = alpha.flip_rand_spin()
         if beta.energy <= alpha.energy:
             output += [beta]
             alpha = beta
-            print('accept beta')
         else:
             prob = np.exp((alpha.energy - beta.energy)/T)
             if rng.random() < prob:
                 output += [beta]
                 alpha = beta
-                print('accept beta')
             else:
                 output += [alpha]
-                print('REJECT beta')
-        count += 1
-        print(f'Generated {count} of {size} samples')
     return output
+
+
+def exact_limit_m(J, h, T):
+    beta = 1/T
+    sinh = np.sinh(beta*h)
+    return sinh/np.sqrt(sinh**2 + np.exp(-4*beta*J))
+
+
+def exact_m(J, h, T):
+    beta = 1/T
+    cosh = np.cosh(beta*h)
+    sinh = np.sinh(beta*h)
+    expBJ = np.exp(beta*J)
+    sqrt = np.sqrt(sinh**2 + expBJ**(-4))
+    lm = expBJ*(cosh-sqrt)
+    lp = expBJ*(cosh-sqrt)
 
 
 if __name__ == '__main__':
     N = 100
     J = 1
-    size = 10**5
+    size = 10**4
     teq = size * 0.05
     initial_spins = np.full(N, 1)
     initial_spins[rng.choice(N, size=N//2, replace=False)] = -1
     for T in (J/2, J, 2*J):
-        for h in J*np.arange(-2, 2, 0.02):
-            initial = config(initial_spins, J, h)
+        avgM = []
+        avgeng = []
+        hspace = J*np.arange(-2, 2, 0.02)
+        for h in hspace:
+            print(h)
+            initial = config(initial_spins, J, h, M=0)
             samples = generate_samples(initial, J, h, T, size)
-            M = [s.M for s in samples]
-            eng = [e.energy for e in samples]
-            print(set(M))
-            print(set(eng))
-            plt.figure()
-            plt.plot(np.arange(len(samples)), M)
-            plt.title('M')
-            plt.figure()
-            plt.plot(np.arange(len(samples)), eng)
-            plt.title('Energy')
-            plt.show()
-            quit()
+            avgM.append(np.mean([s.M for s in samples]))
+            avgeng.append(np.mean([e.energy for e in samples]))
+        plt.figure()
+        plt.plot(hspace, avgM)
+        plt.plot(hspace, N*exact_limit_m(J, hspace, T))
+        plt.title('M')
+        plt.figure()
+        plt.plot(hspace, avgeng)
+        plt.title('Energy')
+        plt.show()
+        quit()
 
 
