@@ -29,36 +29,51 @@ class config:
         return config(new_spins, self.J, self.h, new_M, new_energy)
 
 
-def generate_samples(initial, J, h, T, size):
-    output = [initial]
-    alpha = config(initial, J, h)
-
+def generate_samples(alpha, J, h, T, size):
+    output = [alpha]
+    count = 0
     for i in range(size):
         beta = alpha.flip_rand_spin()
         if beta.energy <= alpha.energy:
-            output += beta
+            output += [beta]
+            alpha = beta
+            print('accept beta')
         else:
             prob = np.exp((alpha.energy - beta.energy)/T)
             if rng.random() < prob:
-                output += beta
+                output += [beta]
+                alpha = beta
+                print('accept beta')
             else:
-                output += alpha
+                output += [alpha]
+                print('REJECT beta')
+        count += 1
+        print(f'Generated {count} of {size} samples')
     return output
 
 
 if __name__ == '__main__':
-    N = 20
+    N = 100
     J = 1
-    h = J * np.arange(-2, 2, 0.02)
-    size = 10**7
-    initial = np.full(N, 1)
-    initial[rng.choice(N, size=N//2, replace=False)] = -1
+    size = 10**5
+    teq = size * 0.05
+    initial_spins = np.full(N, 1)
+    initial_spins[rng.choice(N, size=N//2, replace=False)] = -1
     for T in (J/2, J, 2*J):
-        samples = generate_samples(initial, J, h, T, size)
-        M = [s.M for s in samples]
-
-        plt.figure()
-        plt.plot(h, M)
-    plt.show()
+        for h in J*np.arange(-2, 2, 0.02):
+            initial = config(initial_spins, J, h)
+            samples = generate_samples(initial, J, h, T, size)
+            M = [s.M for s in samples]
+            eng = [e.energy for e in samples]
+            print(set(M))
+            print(set(eng))
+            plt.figure()
+            plt.plot(np.arange(len(samples)), M)
+            plt.title('M')
+            plt.figure()
+            plt.plot(np.arange(len(samples)), eng)
+            plt.title('Energy')
+            plt.show()
+            quit()
 
 
