@@ -85,7 +85,7 @@ def exact_m(J, h, T, N):
 if __name__ == '__main__':
     N = 100  # number of spins
     J = 1  # coupling constant
-    size = 10**4  # number of Monte Carlo steps taken for each pair (T, h)
+    size = 10**6  # number of Monte Carlo steps taken for each pair (T, h)
     idx_eq = int(size * 0.05)  # index after which observable quantities equilibrate
 
     # Create initial state of 50 spins up and 50 spins down randomly distributed.
