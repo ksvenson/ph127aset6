@@ -5,6 +5,9 @@ rng = np.random.default_rng()
 
 
 class config:
+    """
+    An object representing a 1D lattice of Ising spins
+    """
     def __init__(self, spins, J, h, M=None, energy=None):
         self.spins = spins
         self.N = spins.shape[-1]
@@ -54,12 +57,18 @@ def generate_samples(alpha, J, h, T, size):
 
 
 def exact_limit_m(J, h, T):
+    """
+    Returns exact magnetization per spin in the thermodynamic limit N-->infinity
+    """
     beta = 1/T
     sinh = np.sinh(beta*h)
     return sinh/np.sqrt(sinh**2 + np.exp(-4*beta*J))
 
 
 def exact_m(J, h, T, N):
+    """
+    Returns exact magnetization per spin where there are `N` spins.
+    """
     beta = 1/T
     cosh = np.cosh(beta*h)
     sinh = np.sinh(beta*h)
@@ -69,36 +78,44 @@ def exact_m(J, h, T, N):
     lp = expBJ*(cosh+sqrt)
     Z = lm**N + lp**N
 
-    der = cosh/sqrt
+    der = cosh/sqrt  # helper variable, short for "derivative"
     m = expBJ*sinh*(lm**(N-1)*(1-der) + lp**(N-1)*(1+der))/Z
     return m
 
 
 if __name__ == '__main__':
-    N = 100
-    J = 1
-    size = 10**3
-    teq = size * 0.05
+    N = 100  # number of spins
+    J = 1  # coupling constant
+    size = 10**6  # number of Monte Carlo steps taken for each pair (T, h)
+    idx_eq = int(size * 0.05)  # index after which observable quantities equilibrate
     hspace = J*np.arange(-2, 2, 0.02)
+    # Create initial state of 50 spins up and 50 spins down randomly distributed.
     initial_spins = np.full((len(hspace), N), 1)
     for i in range(len(hspace)):
         initial_spins[i, rng.choice(N, size=N//2, replace=False)] = -1
+    # T in units of energy
     for T in (J/2, J, 2*J):
         initial = config(initial_spins, J, hspace, M=0)
         samples = generate_samples(initial, J, hspace, T, size)
         avgM = [np.mean([s.M[i] for s in samples]) for i in range(len(hspace))]
+
         plt.figure()
+        avgM = np.array(avgM)
+        exact = N*exact_m(J, hspace, T, N)
         plt.plot(hspace, avgM, label='Monte Carlo')
-        plt.plot(hspace, N*exact_limit_m(J, hspace, T), label='Exact Solution in Thermodynamic Limit')
-        plt.plot(hspace, N*exact_m(J, hspace, T, N), label=rf'Exact Solution for $N={N}$')
+        plt.plot(hspace, exact, label=rf'Exact Solution for $N={N}$')
         plt.legend(bbox_to_anchor=(0.5,-0.35), loc='lower center')
         plt.title(rf'Magnetization at $T = {T/J} \cdot J/k_B$')
         plt.xlabel(rf'$h/J$')
         plt.ylabel('Average Magnetization')
         plt.savefig(f'temp_{T}.png', bbox_inches='tight')
-        # plt.figure()
-        # plt.plot(hspace, avgeng)
-        # plt.title('Energy')
+
+        plt.figure()
+        plt.plot(hspace, avgM-exact)
+        plt.title(rf'Error at $T = {T/J} \cdot J/k_B$')
+        plt.xlabel(rf'$h/J$')
+        plt.ylabel('Error')
+        plt.savefig(f'temp_{T}_error.png', bbox_inches='tight')
     plt.show()
 
 
