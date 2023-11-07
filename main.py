@@ -122,6 +122,8 @@ if __name__ == '__main__':
         plt.xlabel(rf'$h/J$')
         plt.ylabel('Error')
         plt.savefig(f'temp_{T}_error.png', bbox_inches='tight')
+        plt.yscale('log')
+        plt.savefig(f'temp_{T}_log_error.png', bbox_inches='tight')
     plt.show()
 
 
