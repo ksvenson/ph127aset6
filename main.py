@@ -4,11 +4,20 @@ import matplotlib.pyplot as plt
 rng = np.random.default_rng()
 
 
-class config:
+class config_array:
     """
-    An object representing a 1D lattice of Ising spins
+    An object representing many instances of a 1D lattice of Ising spins. Each instance has a different value for the
+    parameter `h`.
     """
     def __init__(self, spins, J, h, M=None, energy=None):
+        """
+        :param spins: A 2D array of spins (-1 or 1). The first dimension should equal the length of `h`.
+                      The second dimension is the number of spins in the model.
+        :param J: Coupling strength (scalar)
+        :param h: External field, 1 dimensional array.
+        :param M: Magnetization. Passing as a parameter saves computation time.
+        :param energy: Energy. Passing as a parameter saves computation time.
+        """
         self.spins = spins
         self.N = spins.shape[-1]
         self.J = J
@@ -23,37 +32,40 @@ class config:
             self.energy = self.compute_energy()
 
     def compute_energy(self):
-        return -self.J*np.sum(self.spins * np.roll(self.spins, 1, axis=-1)) - self.h*self.M
+        return -self.J*np.sum(self.spins * np.roll(self.spins, 1, axis=-1), axis=-1) - self.h*np.sum(self.spins, axis=-1)
 
     def compute_M(self):
         return np.sum(self.spins, axis=-1)
 
     def flip_rand_spin(self):
         i0 = rng.integers(0, self.N, len(self.h))
-        idx = np.arange(len(self.h))
+        idx = np.arange(len(self.h))  # helper array for operations below.
         new_spins = np.copy(self.spins)
         new_spins[idx, i0] = -self.spins[idx, i0]
         new_M = self.M + 2*new_spins[idx, i0]
-        new_energy = self.energy
+        new_energy = np.copy(self.energy)
         new_energy -= 2*self.J*new_spins[idx, i0]*(new_spins[idx, (i0-1) % self.N] + new_spins[idx, (i0+1) % self.N])
         new_energy -= 2*self.h*new_spins[idx, i0]
-        return config(new_spins, self.J, self.h, new_M, new_energy)
+        return config_array(new_spins, self.J, self.h, M=new_M, energy=new_energy)
 
 
 def generate_samples(alpha, J, h, T, size):
-    output = [alpha]
+    output_M = [alpha.M]
+    output_energy = [alpha.energy]
     for i in range(size):
+        print(f'i: {i}')
         beta = alpha.flip_rand_spin()
         prob = np.exp((alpha.energy - beta.energy)/T)
         rand = rng.random(size=len(h))
         accept = (beta.energy <= alpha.energy) | (rand < prob)
         new_M = np.where(accept, beta.M, alpha.M)
         new_energy = np.where(accept, beta.energy, alpha.energy)
-        accept = np.vstack((accept,)*beta.spins.shape[-1]).T
+        accept = np.array([[x]*alpha.N for x in accept])
         new_spins = np.where(accept, beta.spins, alpha.spins)
-        alpha = config(new_spins, J, h, M=new_M, energy=new_energy)
-        output.append(alpha)
-    return output
+        alpha = config_array(new_spins, J, h, M=new_M, energy=new_energy)
+        output_M.append(alpha.M)
+        output_energy.append(alpha.energy)
+    return np.array(output_M), np.array(output_energy)
 
 
 def exact_limit_m(J, h, T):
@@ -86,7 +98,7 @@ def exact_m(J, h, T, N):
 if __name__ == '__main__':
     N = 100  # number of spins
     J = 1  # coupling constant
-    size = 10**6  # number of Monte Carlo steps taken for each pair (T, h)
+    size = 10**4  # number of Monte Carlo steps taken for each pair (T, h)
     idx_eq = int(size * 0.05)  # index after which observable quantities equilibrate
     hspace = J*np.arange(-2, 2, 0.02)
     # Create initial state of 50 spins up and 50 spins down randomly distributed.
@@ -95,9 +107,13 @@ if __name__ == '__main__':
         initial_spins[i, rng.choice(N, size=N//2, replace=False)] = -1
     # T in units of energy
     for T in (J/2, J, 2*J):
-        initial = config(initial_spins, J, hspace, M=0)
-        samples = generate_samples(initial, J, hspace, T, size)
-        avgM = [np.mean([s.M[i] for s in samples]) for i in range(len(hspace))]
+        initial = config_array(initial_spins, J, hspace, M=np.zeros(len(hspace)))
+        sample_M, sample_energy = generate_samples(initial, J, hspace, T, size)
+        avgM = np.mean(sample_M[idx_eq:], axis=0)
+        # plt.figure()
+        # plt.plot(np.arange(size+1), sample_M[:,100])
+        # plt.show()
+        # quit()
 
         plt.figure()
         avgM = np.array(avgM)
