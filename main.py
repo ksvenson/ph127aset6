@@ -31,6 +31,8 @@ class config_array:
         else:
             self.energy = self.compute_energy()
 
+        self.idx = np.arange(len(self.h))  # helper array for operations below.
+
     def compute_energy(self):
         return -self.J*np.sum(self.spins * np.roll(self.spins, 1, axis=-1), axis=-1) - self.h*np.sum(self.spins, axis=-1)
 
@@ -39,21 +41,19 @@ class config_array:
 
     def flip_rand_spin(self):
         i0 = rng.integers(0, self.N, len(self.h))
-        idx = np.arange(len(self.h))  # helper array for operations below.
         new_spins = np.copy(self.spins)
-        new_spins[idx, i0] = -self.spins[idx, i0]
-        new_M = self.M + 2*new_spins[idx, i0]
+        new_spins[self.idx, i0] = -self.spins[self.idx, i0]
+        new_M = self.M + 2*new_spins[self.idx, i0]
         new_energy = np.copy(self.energy)
-        new_energy -= 2*self.J*new_spins[idx, i0]*(new_spins[idx, (i0-1) % self.N] + new_spins[idx, (i0+1) % self.N])
-        new_energy -= 2*self.h*new_spins[idx, i0]
+        new_energy -= 2*self.J*new_spins[self.idx, i0]*(new_spins[self.idx, (i0-1) % self.N] + new_spins[self.idx, (i0+1) % self.N])
+        new_energy -= 2*self.h*new_spins[self.idx, i0]
         return config_array(new_spins, self.J, self.h, M=new_M, energy=new_energy)
 
 
 def generate_samples(alpha, J, h, T, size):
     output_M = [alpha.M]
     output_energy = [alpha.energy]
-    for i in range(size):
-        print(f'i: {i}')
+    for _ in range(size):
         beta = alpha.flip_rand_spin()
         prob = np.exp((alpha.energy - beta.energy)/T)
         rand = rng.random(size=len(h))
@@ -98,25 +98,36 @@ def exact_m(J, h, T, N):
 if __name__ == '__main__':
     N = 100  # number of spins
     J = 1  # coupling constant
-    size = 10**4  # number of Monte Carlo steps taken for each pair (T, h)
-    idx_eq = int(size * 0.05)  # index after which observable quantities equilibrate
+    size = 10**5  # number of Monte Carlo steps taken for each pair (T, h)
+    idx_eq = 10**3  # index after which observable quantities equilibrate. Found experimentally.
     hspace = J*np.arange(-2, 2, 0.02)
-    # Create initial state of 50 spins up and 50 spins down randomly distributed.
-    initial_spins = np.full((len(hspace), N), 1)
-    for i in range(len(hspace)):
-        initial_spins[i, rng.choice(N, size=N//2, replace=False)] = -1
+    h_idx_sample = 50  # index we use to plot M as a function of iteration
+
     # T in units of energy
     for T in (J/2, J, 2*J):
+        # Create initial state of 50 spins up and 50 spins down randomly distributed.
+        initial_spins = np.full((len(hspace), N), 1)
+        for i in range(len(hspace)):
+            initial_spins[i, rng.choice(N, size=N//2, replace=False)] = -1
         initial = config_array(initial_spins, J, hspace, M=np.zeros(len(hspace)))
-        sample_M, sample_energy = generate_samples(initial, J, hspace, T, size)
-        avgM = np.mean(sample_M[idx_eq:], axis=0)
-        # plt.figure()
-        # plt.plot(np.arange(size+1), sample_M[:,100])
-        # plt.show()
-        # quit()
 
+        sample_M, sample_energy = generate_samples(initial, J, hspace, T, size)
+        np.save(f'sample_M_at_T_{T}', sample_M)
+        avgM = np.mean(sample_M[idx_eq:], axis=0)
+
+        # Plotting sampled M over iterations
         plt.figure()
-        avgM = np.array(avgM)
+        plt.plot(np.arange(size+1), sample_M[:,h_idx_sample])
+        plt.axvline(x=idx_eq, linestyle='-', label='Transient-Equilibrated Cutoff')
+        plt.title(f'Sampled Magnetization over 10e{int(np.log10(size))} Iterations at\n'
+                  + rf'$(T, h) = ({T/J}\cdot J/k_B, {round(hspace[h_idx_sample]/J, 2)} \cdot J)$')
+        plt.xlabel('Iteration')
+        plt.ylabel('Magnetization')
+        plt.legend()
+        plt.savefig(f'sample_M_at_(T_h)_({T}_{round(hspace[h_idx_sample], 1)}).png', bbox_inches='tight')
+
+        # Plotting M(h)
+        plt.figure()
         exact = N*exact_m(J, hspace, T, N)
         plt.plot(hspace, avgM, label='Monte Carlo')
         plt.plot(hspace, exact, label=rf'Exact Solution for $N={N}$')
@@ -126,6 +137,7 @@ if __name__ == '__main__':
         plt.ylabel('Average Magnetization')
         plt.savefig(f'temp_{T}.png', bbox_inches='tight')
 
+        # Plotting error
         plt.figure()
         plt.plot(hspace, avgM-exact)
         plt.title(rf'Error at $T = {T/J} \cdot J/k_B$')
@@ -135,5 +147,3 @@ if __name__ == '__main__':
         plt.yscale('log')
         plt.savefig(f'temp_{T}_log_error.png', bbox_inches='tight')
     plt.show()
-
-
