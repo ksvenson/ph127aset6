@@ -52,7 +52,6 @@ class config_array:
 
 def generate_samples(alpha, J, h, T, size):
     output_M = [alpha.M]
-    output_energy = [alpha.energy]
     for _ in range(size):
         beta = alpha.flip_rand_spin()
         prob = np.exp((alpha.energy - beta.energy)/T)
@@ -64,8 +63,7 @@ def generate_samples(alpha, J, h, T, size):
         new_spins = np.where(accept, beta.spins, alpha.spins)
         alpha = config_array(new_spins, J, h, M=new_M, energy=new_energy)
         output_M.append(alpha.M)
-        output_energy.append(alpha.energy)
-    return np.array(output_M), np.array(output_energy)
+    return np.array(output_M)
 
 
 def exact_limit_m(J, h, T):
@@ -98,7 +96,7 @@ def exact_m(J, h, T, N):
 if __name__ == '__main__':
     N = 100  # number of spins
     J = 1  # coupling constant
-    size = 10**5  # number of Monte Carlo steps taken for each pair (T, h)
+    size = 10**6  # number of Monte Carlo steps taken for each pair (T, h)
     idx_eq = 10**3  # index after which observable quantities equilibrate. Found experimentally.
     hspace = J*np.arange(-2, 2, 0.02)
     h_idx_sample = 50  # index we use to plot M as a function of iteration
@@ -106,12 +104,12 @@ if __name__ == '__main__':
     # T in units of energy
     for T in (J/2, J, 2*J):
         # Create initial state of 50 spins up and 50 spins down randomly distributed.
-        initial_spins = np.full((len(hspace), N), 1)
+        initial_spins = np.full((len(hspace), N), 1, dtype='int8')
         for i in range(len(hspace)):
             initial_spins[i, rng.choice(N, size=N//2, replace=False)] = -1
-        initial = config_array(initial_spins, J, hspace, M=np.zeros(len(hspace)))
+        initial = config_array(initial_spins, J, hspace, M=np.zeros(len(hspace), dtype='int8'))
 
-        sample_M, sample_energy = generate_samples(initial, J, hspace, T, size)
+        sample_M = generate_samples(initial, J, hspace, T, size)
         np.save(f'sample_M_at_T_{T}', sample_M)
         avgM = np.mean(sample_M[idx_eq:], axis=0)
 
